@@ -32,7 +32,7 @@ void create_matrix(int*** matrix, int h, int w) {
     *matrix = new int*[h];
 
     for (int i = 0; i < h; ++i) {
-        (*matrix)[i] = new int[w];
+        (*matrix)[i] = new int[w]{};
     }
 }
 
@@ -70,6 +70,7 @@ private:
     bool playing = false;
     bool paused = false;
     bool attaching = false;
+    bool game_over = false;
 
 public:
     Tetris() {
@@ -96,17 +97,19 @@ public:
         wait_for_start();
 
         int count = 0;
-        int max_count = 10;
+        int max_count = 20;
         while (playing) {
-            usleep(30000);
+            usleep(25000);
 
             process_user_input();
 
             if (attaching) {
                 add_figure_to_field();
 
-                if (is_game_end()) {
-                    break;
+                if (is_game_over()) {
+                    game_over = true;
+                    render_game();
+                    wait_to_quit();
                 }
 
                 spawn_figure();
@@ -114,7 +117,7 @@ public:
                 attaching = false;
             }
 
-            if (!paused && ++count == max_count) {
+            if (!paused && !game_over && ++count == max_count) {
                 shift_figure();
 
                 count = 0;
@@ -130,7 +133,31 @@ private:
 /*                               Game Library                                */
 /* ========================================================================= */
 
-    bool is_game_end() {
+    void init_game() {
+        create_matrix(&m_field, m_height, m_width);
+
+        m_size = create_figure(&m_figure);
+
+        m_x = (m_width - m_size) / 2;
+        m_y = 0;
+    }
+
+    void deinit_game() {
+        free_matrix(m_field, m_height);
+        free_matrix(m_figure, m_size);
+    }
+
+    void restart_game() {
+        deinit_game();
+
+        init_game();
+
+        paused = false;
+        attaching = false;
+        game_over = false;
+    }
+
+    bool is_game_over() {
         return m_y <= 0;
     }
 
@@ -139,6 +166,8 @@ private:
 
         if (key == 'q') {
             playing = false;
+        } else if (key == 'r') {
+            restart_game();
         } else if (key == 'p') {
             paused = !paused;
         } else if (!paused) {
@@ -219,12 +248,24 @@ private:
         playing = true;
     }
 
+    void wait_to_quit() {
+        char key;
+        while ((key = getch()) != 'q') {
+            if (key == 'r' || key == '\n') {
+                restart_game();
+                return;
+            }
+        }
+
+        playing = false;
+    }
+
     void spawn_figure() {
         free_matrix(m_figure, m_size);
 
         create_figure(&m_figure);
 
-        m_x = (m_width - m_size) / 2;
+        m_x = (m_width - m_size) / 2 + rng.rand(-3, 3);
         m_y = 0;
     }
 
@@ -351,12 +392,25 @@ private:
         refresh();
         box(game_window, 0, 0);
 
-        for (int i = 0; i < m_height; ++i) {
-            for (int j = 0; j < m_width; ++j) {
-                if (m_field[i][j] == 1) {
-                    mvwprintw(game_window, i + 1, 3 * j + 1, "[+]");
-                } else {
-                    mvwprintw(game_window, i + 1, 3 * j + 1, "   ");
+        if (!playing) {
+            mvwprintw(game_window, 1, 2, "[ENTER]   to start");
+            mvwprintw(game_window, 2, 2, "[A][S][D] to move");
+            mvwprintw(game_window, 3, 2, "[W]       to rotate");
+            mvwprintw(game_window, 4, 2, "[R]       to restart");
+            mvwprintw(game_window, 5, 2, "[Q]       to quit");
+            mvwprintw(game_window, 10, 13, "[START]");
+        } else if (game_over) {
+            mvwprintw(game_window, 10, 11, "[GAME_OVER]");
+        } else if (paused) {
+            mvwprintw(game_window, 10, 13, "[PAUSE]");
+        } else {
+            for (int i = 0; i < m_height; ++i) {
+                for (int j = 0; j < m_width; ++j) {
+                    if (m_field[i][j] == 1) {
+                        mvwprintw(game_window, i + 1, 3 * j + 1, "[+]");
+                    } else {
+                        mvwprintw(game_window, i + 1, 3 * j + 1, "   ");
+                    }
                 }
             }
         }
