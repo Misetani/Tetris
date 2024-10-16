@@ -101,26 +101,16 @@ public:
         while (playing) {
             usleep(25000);
 
-            process_user_input();
-
-            if (attaching) {
-                add_figure_to_field();
-
-                if (is_game_over()) {
-                    game_over = true;
-                    render_game();
-                    wait_to_quit();
-                }
-
-                spawn_figure();
-
-                attaching = false;
-            }
-
             if (!paused && !game_over && ++count == max_count) {
                 shift_figure();
 
                 count = 0;
+            } else {
+                process_user_input();
+            }
+
+            if (is_figure_attached()) {
+                attach_figure();
             }
 
             render_game();
@@ -132,6 +122,48 @@ private:
 /* ========================================================================= */
 /*                               Game Library                                */
 /* ========================================================================= */
+
+    void attach_figure() {
+        add_figure_to_field();
+
+        clear_rows();
+
+        if (is_game_over()) {
+            game_over = true;
+            render_game();
+            wait_to_quit_or_restart();
+        }
+
+        spawn_figure();
+
+        attaching = false;
+    }
+
+    void clear_rows() {
+        for (int i = m_height - 1; i > 0; --i) {
+            if (is_row_full(i)) {
+                for (int k = i; k > 0; --k) {
+                    for (int j = 0; j < m_width; ++j) {
+                        m_field[k][j] = m_field[k - 1][j];
+                    }
+                }
+
+                ++i;
+            }
+        }
+    }
+
+    bool is_row_full(int i) {
+        bool is_full = true;
+
+        for (int j = 0; j < m_width; ++j) {
+            if (!m_field[i][j]) {
+                is_full = false;
+            }
+        }
+
+        return is_full;
+    }
 
     void init_game() {
         create_matrix(&m_field, m_height, m_width);
@@ -196,7 +228,7 @@ private:
         int** temp_figure = m_figure;
         m_figure = rotated_figure;
 
-        if (!is_figure_in_field()) {
+        if (!is_figure_in_field() && !is_figure_attached()) {
             m_figure = temp_figure;
 
             free_matrix(rotated_figure, m_size);
@@ -206,34 +238,22 @@ private:
     }
 
     void move_figure_down() {
-        if (!is_figure_attached()) {
-            ++m_y;
-        } else {
-            attaching = true;
-        }
+        ++m_y;
     }
 
     void move_figure_left() {
-        if (!is_figure_attached()) {
-            --m_x;
+        --m_x;
 
-            if (!is_figure_in_field()) {
-                ++m_x;
-            }
-        } else {
-            attaching = true;
+        if (!is_figure_in_field()) {
+            ++m_x;
         }
     }
 
     void move_figure_right() {
-        if (!is_figure_attached()) {
-            ++m_x;
+        ++m_x;
 
-            if (!is_figure_in_field()) {
-                --m_x;
-            }
-        } else {
-            attaching = true;
+        if (!is_figure_in_field()) {
+            --m_x;
         }
     }
 
@@ -248,7 +268,7 @@ private:
         playing = true;
     }
 
-    void wait_to_quit() {
+    void wait_to_quit_or_restart() {
         char key;
         while ((key = getch()) != 'q') {
             if (key == 'r' || key == '\n') {
