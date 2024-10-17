@@ -76,19 +76,13 @@ public:
     Tetris() {
         init_ncurses();
 
-        create_matrix(&m_field, m_height, m_width);
-
-        m_size = create_figure(&m_figure);
-
-        m_x = (m_width - m_size) / 2;
-        m_y = 0;
+        init_game();
     }
 
     ~Tetris() {
-        free_matrix(m_field, m_height);
-        free_matrix(m_figure, m_size);
+        deinit_game();
 
-        cleanup_ncurses();
+        deinit_ncurses();
     }
 
     void play() {
@@ -299,7 +293,7 @@ private:
 
         int count = 0;
 
-        int size;
+        int size = 0;
         while (count != figure_number) {
             fin >> size;
 
@@ -400,7 +394,7 @@ private:
         noecho();
     }
 
-    void cleanup_ncurses() {
+    void deinit_ncurses() {
         endwin();
     }
 
